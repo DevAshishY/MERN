@@ -6,8 +6,6 @@ import uploadOnCloudinary from "../utils/cloudinary.js";
 
 const registerUser = asyncHandler(async (req, res) => {
   const { email, userName, fullName, password } = req.body;
-  console.log(email, userName, fullName);
-  console.log('DEBUG req.files:', req.files);
   // check if filed are empty
   // implement middleware for before registerion upload img and avatar in user.route.js
 
@@ -35,7 +33,6 @@ const registerUser = asyncHandler(async (req, res) => {
   // check for images and avatar
   const avalarLocalPath = req.files?.avatar?.[0]?.path;
   const coverLocalPath = req.files?.coverImage?.[0]?.path;
-  console.log('DEBUG avatarLocalPath:', avalarLocalPath, 'coverLocalPath:', coverLocalPath);
   if (!avalarLocalPath) {
     throw new ApiError(400, "avatar file is required");
   }
@@ -46,7 +43,6 @@ const registerUser = asyncHandler(async (req, res) => {
   const coverImage = await uploadOnCloudinary(coverLocalPath);
 
   if (!avatar) {
-    console.log('DEBUG: avatar upload failed for path:', avalarLocalPath);
     throw new ApiError(400, "avatar upload failed");
   }
 
