@@ -14,3 +14,7 @@ user agent in header : get user browser
 ## trace - if is using for test netwrok like sometime using proxi so take time so debugging this thing using trace
 
 ## app.get and app.use in router call 
+
+## some method
+
+## how to send file on postman
