@@ -95,7 +95,7 @@ const loginUser = asyncHandler(async (req, res) => {
   // send on cookies sequre cookies
 
   // Get data form login screen
-
+  console.log(req.body, "fgfgfg");
   const { email, userName, password } = req.body;
 
   if (!email || !userName) {
@@ -119,8 +119,7 @@ const loginUser = asyncHandler(async (req, res) => {
   );
 
   const loggedInUser = await User.findById(user._id).select(
-    "-password",
-    "refreshToken",
+    "-password -refreshToken",
   );
   //  default cookies can manage frontend but when we httpOnly true , then only allow backend
   const options = {
@@ -130,8 +129,8 @@ const loginUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .cookie("accessToken", options)
-    .cookie("refreshToken", options)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
     .json(
       new ApiResponse(
         200,
@@ -141,21 +140,23 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
-const logoutUser = asyncHandler(async(req,res)=>{
-  await  User.findByIdAndUpdate(req.user._id,{
-    $set:{
-      refreshToken:undefined
-    }
-   })
-    const options = {
+const logoutUser = asyncHandler(async (req, res) => {
+  // req.user._id comes from the authenticated JWT payload, decoded and attached by verifyJWT middleware.
+
+  await User.findByIdAndUpdate(req.user._id, {
+    $set: {
+      refreshToken: undefined,
+    },
+  });
+  const options = {
     httpOnly: true,
     secure: true,
   };
 
   return res
-  .status(200)
-  .clearCookie("accessToken",options)
-  .clearCookie("refreshToken",options)
-  .json(new ApiResponse(200,'user logout '))
-})
-export { registerUser, loginUser,logoutUser };
+    .status(200)
+    .clearCookie("accessToken",  options)
+    .clearCookie("refreshToken",  options)
+    .json(new ApiResponse(200, "user logout "));
+});
+export { registerUser, loginUser, logoutUser };
