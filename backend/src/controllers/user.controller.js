@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandles.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
+import { json } from "express";
 
 const generateAccessAndRefreshToken = async (userId) => {
   try {
@@ -215,4 +216,59 @@ const refreshToken = asyncHandler(async (req, res) => {
     throw new ApiError(401, error?.message || "invalid refresh token");
   }
 });
-export { registerUser, loginUser, logoutUser, refreshToken };
+
+const changePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  const user = await User.findById(req.user?._id);
+
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+  if (!isPasswordCorrect) {
+    throw new ApiError(400, "invalid old password");
+  }
+
+  user.password = newPassword;
+
+  await user.save(validateBeforeSave, false);
+
+  return res.status(200).json(new ApiResponse(200, {}, "password is changes"));
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  return (
+    res.status(200),
+    json(ApiResponse(200, req.user, "current user fetch sucessfully"))
+  );
+});
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  const { fullName, email } = req.body;
+  if (!fullName || !email) {
+    throw ApiError(400, "all files are required");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        fullName,
+        email,
+      },
+    },
+    { new: true },
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "details successful updated"));
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshToken,
+  changePassword,
+  getCurrentUser,
+  updateAccountDetails,
+};
