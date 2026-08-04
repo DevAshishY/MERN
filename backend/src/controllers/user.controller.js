@@ -263,6 +263,59 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "details successful updated"));
 });
 
+const updateAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "avatar ufile is missing");
+  }
+
+  const newAvatarPath = await uploadOnCloudinary(avatarLocalPath);
+  if (!newAvatarPath) {
+    throw new ApiError(400, "error while uploading on avatar ");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        avatar: newAvatarPath.url,
+      },
+    },
+    { new: true },
+  ).select("-password");
+
+  return (
+    res.status(200),
+    json(new ApiResponse(200, user, "Avatar sucessful updated"))
+  );
+});
+
+const updateCoverImg = asyncHandler(async (req, res) => {
+  const coverImgLocalPath = req.file?.path;
+  if (!coverImgLocalPath) {
+    throw new ApiError(400, "cover Img  is missing");
+  }
+
+  const newCoverImgPath = await uploadOnCloudinary(coverImgLocalPath);
+  if (!newCoverImgPath) {
+    throw new ApiError(400, "error while uploading on cover Img ");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        coverImage: newCoverImgPath.url,
+      },
+    },
+    { new: true },
+  ).select("-password");
+
+  return (
+    res.status(200),
+    json(new ApiResponse(200, user, "cover Img sucessful updated"))
+  );
+});
 export {
   registerUser,
   loginUser,
@@ -271,4 +324,6 @@ export {
   changePassword,
   getCurrentUser,
   updateAccountDetails,
+  updateAvatar,
+  updateCoverImg,
 };
