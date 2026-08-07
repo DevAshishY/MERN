@@ -16,12 +16,11 @@ export const verifyJWT = asyncHandler(async (req, _, next) => {
     console.log(decodedToken);
 
     const user = await User.findById(decodedToken?._id).select(
-      "-password, -refreshToken",
+      "-password -refreshToken",
     );
 
     if (!user) {
-      //
-      throw ApiError(401, "Invalid access token");
+      throw new ApiError(401, "Invalid access token");
     }
 
     req.user = user;

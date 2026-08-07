@@ -4,7 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandles.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
-import { json } from "express";
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshToken = async (userId) => {
   try {
@@ -97,7 +97,6 @@ const loginUser = asyncHandler(async (req, res) => {
   // send on cookies sequre cookies
 
   // Get data form login screen
-  console.log(req.body, "fgfgfg");
   const { email, userName, password } = req.body;
 
   if (!email || !userName) {
@@ -113,7 +112,7 @@ const loginUser = asyncHandler(async (req, res) => {
   }
   const isPasswordValid = await user.isPasswordCorrect(password);
   if (!isPasswordValid) {
-    throw new ApiError(404, "INvalid user cred..");
+    throw new ApiError(404, "Invalid user cred..");
   }
 
   const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
@@ -229,22 +228,23 @@ const changePassword = asyncHandler(async (req, res) => {
 
   user.password = newPassword;
 
-  await user.save(validateBeforeSave, false);
+  await user.save({ validateBeforeSave: false });
 
-  return res.status(200).json(new ApiResponse(200, {}, "password is changes"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "password is changes"));
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-  return (
-    res.status(200),
-    json(ApiResponse(200, req.user, "current user fetch sucessfully"))
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "current user fetch sucessfully"));
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
   const { fullName, email } = req.body;
   if (!fullName || !email) {
-    throw ApiError(400, "all files are required");
+    throw new ApiError(400, "all fields are required");
   }
 
   const user = await User.findByIdAndUpdate(
@@ -255,12 +255,11 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
         email,
       },
     },
-    { new: true },
+    { new: true, runValidators: true },
   ).select("-password");
-
   return res
     .status(200)
-    .json(new ApiResponse(200, user, "details successful updated"));
+    .json(new ApiResponse(200, user, "user profile successfully updated"));
 });
 
 const updateAvatar = asyncHandler(async (req, res) => {
@@ -284,10 +283,12 @@ const updateAvatar = asyncHandler(async (req, res) => {
     { new: true },
   ).select("-password");
 
-  return (
-    res.status(200),
-    json(new ApiResponse(200, user, "Avatar sucessful updated"))
-  );
+  // Delete avatar after upload from local
+  // Delete avatar after upload from local
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Avatar successfully updated"));
 });
 
 const updateCoverImg = asyncHandler(async (req, res) => {
@@ -310,11 +311,133 @@ const updateCoverImg = asyncHandler(async (req, res) => {
     },
     { new: true },
   ).select("-password");
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "cover image successfully updated"));
+});
 
-  return (
-    res.status(200),
-    json(new ApiResponse(200, user, "cover Img sucessful updated"))
-  );
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  // const username = req.params.username; // by params
+  const username = req.query.userName; // by query
+  if (!username?.trim()) {
+    throw new ApiError(400, "user name is missing");
+  }
+
+  const userName = username.toLowerCase();
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        userName,
+      },
+    },
+    {
+      $lookup: {
+        from: "subscription",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscription",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers",
+        },
+        channelssubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribedTo"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullName: 1,
+        userName: 1,
+        subscribersCount: 1,
+        channelssubscribedToCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1,
+        email: 1,
+      },
+    },
+  ]);
+  if (!channel?.length) {
+    throw new ApiError(404, "channel does not exists ");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, channel[0], "user channel fetch sucessfully "));
+});
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      },
+    },
+    {
+      $lookup: {
+        from: "video",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    userName: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user[0]?.watchHistory || [],
+        "watch history fetch successfully",
+      ),
+    );
 });
 export {
   registerUser,
@@ -326,4 +449,6 @@ export {
   updateAccountDetails,
   updateAvatar,
   updateCoverImg,
+  getUserChannelProfile,
+  getWatchHistory,
 };
